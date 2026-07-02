@@ -1,0 +1,488 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>AskMyPDF - Research Assistant</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/dompurify@3.1.6/dist/purify.min.js"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap');
+
+        * {
+            font-family: 'Inter', sans-serif;
+        }
+
+        body {
+            background:
+                radial-gradient(circle at top left, rgba(34, 197, 94, 0.12), transparent 28%),
+                radial-gradient(circle at top right, rgba(14, 165, 233, 0.12), transparent 25%),
+                linear-gradient(180deg, #f8fafc 0%, #eef2ff 100%);
+        }
+
+        .app-shell {
+            position: relative;
+        }
+
+        .app-shell::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background-image: linear-gradient(rgba(15, 23, 42, 0.03) 1px, transparent 1px), linear-gradient(90deg, rgba(15, 23, 42, 0.03) 1px, transparent 1px);
+            background-size: 24px 24px;
+            mask-image: linear-gradient(180deg, rgba(0, 0, 0, 0.18), transparent 70%);
+            pointer-events: none;
+        }
+
+        .panel {
+            background: rgba(255, 255, 255, 0.78);
+            backdrop-filter: blur(18px);
+            border: 1px solid rgba(148, 163, 184, 0.18);
+            box-shadow: 0 20px 50px rgba(15, 23, 42, 0.08);
+        }
+
+        .panel-strong {
+            background: linear-gradient(180deg, rgba(255, 255, 255, 0.92), rgba(255, 255, 255, 0.82));
+        }
+
+        .upload-zone {
+            border: 1.5px dashed #cbd5e1;
+            transition: all 0.25s ease;
+        }
+
+        .upload-zone:hover,
+        .upload-zone.dragover {
+            border-color: #0f766e;
+            background: rgba(15, 118, 110, 0.04);
+        }
+
+        .btn-primary {
+            background: linear-gradient(135deg, #0f766e 0%, #0284c7 100%);
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .btn-primary:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 12px 24px rgba(15, 118, 110, 0.22);
+        }
+
+        .btn-danger {
+            background: linear-gradient(135deg, #ef4444 0%, #f97316 100%);
+        }
+
+        .document-card {
+            transition: transform 0.2s ease, box-shadow 0.2s ease;
+        }
+
+        .document-card:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+        }
+
+        .document-card.selected {
+            border-color: #0f766e;
+            background: linear-gradient(180deg, rgba(240, 253, 250, 0.95), rgba(255, 255, 255, 1));
+            box-shadow: 0 12px 28px rgba(15, 118, 110, 0.12);
+        }
+
+        .answer-card {
+            border-left: 4px solid #0f766e;
+        }
+
+        .source-tag {
+            background: linear-gradient(135deg, #0f766e 0%, #0284c7 100%);
+        }
+
+            .answer-content {
+                line-height: 1.7;
+                color: #334155;
+            }
+
+            .answer-content table {
+                width: 100%;
+                border-collapse: collapse;
+                margin: 0.75rem 0;
+                border-radius: 0.75rem;
+                overflow: hidden;
+                border: 1px solid #dbeafe;
+                background: #ffffff;
+            }
+
+            .answer-content th,
+            .answer-content td {
+                border: 1px solid #e2e8f0;
+                padding: 0.6rem 0.75rem;
+                text-align: left;
+                vertical-align: top;
+                font-size: 0.95rem;
+            }
+
+            .answer-content thead th {
+                background: #eff6ff;
+                color: #0f172a;
+                font-weight: 700;
+            }
+
+            .answer-content tbody tr:nth-child(even) {
+                background: #f8fafc;
+            }
+
+            .answer-content p,
+            .answer-content ul,
+            .answer-content ol {
+                margin-bottom: 0.65rem;
+            }
+
+        @keyframes pulse-ring {
+            0% { transform: scale(0.85); opacity: 1; }
+            100% { transform: scale(1.25); opacity: 0; }
+        }
+
+        .loading-ring {
+            animation: pulse-ring 1.4s cubic-bezier(0.215, 0.61, 0.355, 1) infinite;
+        }
+
+        .fade-in {
+            animation: fadeIn 0.35s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(8px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+    </style>
+</head>
+<body class="min-h-screen text-slate-900 app-shell">
+    <div class="relative mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+        <header class="mb-8 text-center">
+            <div class="mx-auto mb-5 flex h-16 w-16 items-center justify-center rounded-2xl bg-white/80 shadow-lg ring-1 ring-slate-200">
+                <i class="fas fa-file-lines text-2xl text-teal-700"></i>
+            </div>
+            <h1 class="text-3xl font-extrabold tracking-tight text-slate-900 sm:text-5xl">AskMyPDF</h1>
+            <p class="mx-auto mt-3 max-w-2xl text-sm leading-6 text-slate-600 sm:text-base">
+                Upload a PDF, ask a question, and get a clean answer with the source documents listed below.
+            </p>
+        </header>
+
+
+        <main class="grid gap-6 lg:grid-cols-[1.05fr_0.95fr]">
+            <section class="space-y-6">
+                <div class="panel panel-strong rounded-3xl p-5 sm:p-6">
+                    <div class="mb-4 flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium uppercase tracking-[0.2em] text-teal-700">Documents</p>
+                            <h2 class="mt-1 text-xl font-bold text-slate-900">Upload PDF files</h2>
+                        </div>
+                        <span class="rounded-full bg-teal-50 px-3 py-1 text-xs font-semibold text-teal-700">Simple</span>
+                    </div>
+
+                    <div class="upload-zone mb-4 cursor-pointer rounded-2xl bg-white/80 p-6 text-center" id="uploadZone" onclick="document.getElementById('fileInput').click()">
+                        <div class="mx-auto mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-teal-50 text-teal-700">
+                            <i class="fas fa-cloud-arrow-up text-2xl"></i>
+                        </div>
+                        <p class="text-base font-semibold text-slate-800">Click or drag and drop to upload</p>
+                        <p class="mt-1 text-sm text-slate-500">PDF only, multiple files supported</p>
+                        <input type="file" id="fileInput" accept=".pdf" multiple class="hidden" onchange="uploadFiles()">
+                    </div>
+
+                    <button onclick="clearDocuments()" class="btn-danger inline-flex w-full items-center justify-center gap-2 rounded-xl px-4 py-3 font-semibold text-white">
+                        <i class="fas fa-trash"></i>
+                        Clear all documents
+                    </button>
+                </div>
+
+                <div class="panel rounded-3xl p-5 sm:p-6">
+                    <div class="mb-4 flex items-center justify-between">
+                        <h2 class="text-xl font-bold text-slate-900">Indexed documents</h2>
+                        <span id="docCount" class="rounded-full bg-slate-100 px-3 py-1 text-sm font-semibold text-slate-700">0</span>
+                    </div>
+
+                        <div id="documentsList" class="space-y-3 max-h-80 overflow-y-auto pr-1">
+                        <p class="rounded-2xl border border-dashed border-slate-200 bg-slate-50 py-10 text-center text-sm text-slate-500">No documents uploaded yet</p>
+                    </div>
+                </div>
+            </section>
+
+            <section class="space-y-6">
+                <div class="panel rounded-3xl p-5 sm:p-6">
+                    <div class="mb-4 flex items-center justify-between">
+                        <div>
+                            <p class="text-sm font-medium uppercase tracking-[0.2em] text-teal-700">Ask</p>
+                            <h2 class="mt-1 text-xl font-bold text-slate-900">Ask your question</h2>
+                        </div>
+                        <i class="fas fa-wand-magic-sparkles text-xl text-teal-700"></i>
+                    </div>
+
+                    <div class="relative mb-4">
+                        <input type="text"
+                               id="queryInput"
+                               placeholder="What does the PDF say about...?"
+                               class="w-full rounded-2xl border border-slate-200 bg-white px-4 py-4 pr-12 text-base outline-none transition focus:border-teal-600 focus:ring-4 focus:ring-teal-100">
+                        <i class="fas fa-question-circle absolute right-4 top-1/2 -translate-y-1/2 text-slate-400"></i>
+                    </div>
+
+                    <button onclick="askQuestion()" id="askBtn" class="btn-primary inline-flex w-full items-center justify-center gap-2 rounded-2xl px-4 py-4 font-semibold text-white">
+                        <i class="fas fa-magnifying-glass"></i>
+                        Search and answer
+                    </button>
+                </div>
+
+                <div id="loading" class="hidden panel rounded-3xl p-8 text-center">
+                    <div class="mx-auto mb-4 h-14 w-14 rounded-full border-4 border-teal-100"></div>
+                    <div class="mx-auto -mt-14 h-14 w-14 rounded-full border-4 border-teal-700 border-t-transparent loading-ring"></div>
+                    <p class="mt-4 text-sm font-medium text-slate-600">Reading your documents...</p>
+                </div>
+
+                <div id="answerSection" class="hidden panel rounded-3xl p-5 sm:p-6 fade-in">
+                    <div class="mb-4 flex items-center gap-2">
+                        <i class="fas fa-lightbulb text-amber-500"></i>
+                        <h2 class="text-xl font-bold text-slate-900">Answer</h2>
+                    </div>
+
+                    <div class="answer-card rounded-2xl bg-slate-50 p-5">
+                            <div id="answerText" class="answer-content text-base"></div>
+                    </div>
+
+                    <div class="mt-4 rounded-2xl bg-teal-50 p-5">
+                        <h3 class="mb-3 flex items-center gap-2 text-sm font-semibold uppercase tracking-[0.18em] text-teal-800">
+                            <i class="fas fa-link"></i>
+                            Sources
+                        </h3>
+                        <div id="sourcesList" class="flex flex-wrap gap-2"></div>
+                    </div>
+                </div>
+            </section>
+        </main>
+
+    </div>
+    
+    <script>
+        const API_URL = 'http://localhost:5000';
+        let selectedDocumentIds = [];
+
+        marked.setOptions({ gfm: true, breaks: true });
+
+        function renderAnswer(answer) {
+            const answerEl = document.getElementById('answerText');
+            const markdown = answer || '';
+
+            if (window.marked && window.DOMPurify) {
+                const rawHtml = marked.parse(markdown);
+                answerEl.innerHTML = DOMPurify.sanitize(rawHtml);
+            } else {
+                answerEl.textContent = markdown;
+            }
+        }
+        
+        // Drag and drop functionality
+        const uploadZone = document.getElementById('uploadZone');
+        
+        uploadZone.addEventListener('dragover', (e) => {
+            e.preventDefault();
+            uploadZone.classList.add('dragover');
+        });
+        
+        uploadZone.addEventListener('dragleave', () => {
+            uploadZone.classList.remove('dragover');
+        });
+        
+        uploadZone.addEventListener('drop', (e) => {
+            e.preventDefault();
+            uploadZone.classList.remove('dragover');
+            const files = e.dataTransfer.files;
+            handleFiles(files);
+        });
+        
+        async function uploadFiles() {
+            const fileInput = document.getElementById('fileInput');
+            const files = fileInput.files;
+            
+            if (files.length === 0) return;
+            
+            await handleFiles(files);
+            fileInput.value = '';
+        }
+        
+        async function handleFiles(files) {
+            for (const file of files) {
+                if (!file.name.endsWith('.pdf')) {
+                    alert('Only PDF files are allowed');
+                    continue;
+                }
+                
+                const formData = new FormData();
+                formData.append('file', file);
+                
+                try {
+                    const response = await fetch(`${API_URL}/upload`, {
+                        method: 'POST',
+                        body: formData
+                    });
+                    
+                    const result = await response.json();
+                    if (result.success) {
+                        console.log('Upload successful:', result);
+                    } else {
+                        console.error('Upload failed:', result);
+                    }
+                } catch (error) {
+                    console.error('Upload error:', error);
+                    alert('Error uploading file: ' + error.message);
+                }
+            }
+            
+            loadDocuments();
+        }
+        
+        async function loadDocuments() {
+            try {
+                const response = await fetch(`${API_URL}/documents`);
+                const documents = await response.json();
+                
+                const documentsList = document.getElementById('documentsList');
+                const docCount = document.getElementById('docCount');
+
+                selectedDocumentIds = selectedDocumentIds.filter((id) => documents.some(doc => doc.id === id));
+                window.selectedDocumentIds = selectedDocumentIds;
+
+                if (selectedDocumentIds.length > 0) {
+                    docCount.textContent = `${selectedDocumentIds.length}/${documents.length}`;
+                } else {
+                    docCount.textContent = documents.length;
+                }
+                
+                if (documents.length === 0) {
+                    documentsList.innerHTML = '<p class="text-gray-400 text-center py-8">No documents uploaded yet</p>';
+                    return;
+                }
+                
+                documentsList.innerHTML = '';
+                documents.forEach(doc => {
+                    const div = document.createElement('div');
+                    div.className = 'document-card rounded-2xl border border-slate-200 bg-white p-4 flex items-center justify-between cursor-pointer';
+                    if (selectedDocumentIds.includes(doc.id)) {
+                        div.classList.add('selected');
+                    }
+                    div.dataset.documentId = doc.id;
+                    div.setAttribute('role', 'button');
+                    div.setAttribute('tabindex', '0');
+                    div.setAttribute('onclick', `toggleDocumentSelection(${JSON.stringify(doc.id)})`);
+                    div.innerHTML = `
+                        <div class="flex items-center">
+                            <div class="mr-3 flex h-10 w-10 items-center justify-center rounded-xl bg-red-50 text-red-500">
+                                <i class="fas fa-file-pdf text-lg"></i>
+                            </div>
+                            <div>
+                                <p class="font-semibold text-slate-900">${doc.name}</p>
+                                <p class="text-sm text-slate-500">${doc.chunk_count} chunks indexed</p>
+                            </div>
+                        </div>
+                        <i class="fas fa-circle-check ${selectedDocumentIds.includes(doc.id) ? 'text-teal-600' : 'text-slate-300'}"></i>
+                    `;
+                    div.addEventListener('keydown', (event) => {
+                        if (event.key === 'Enter' || event.key === ' ') {
+                            event.preventDefault();
+                            toggleDocumentSelection(doc.id);
+                        }
+                    });
+                    documentsList.appendChild(div);
+                });
+            } catch (error) {
+                console.error('Error loading documents:', error);
+            }
+        }
+
+        function toggleDocumentSelection(documentId) {
+            if (selectedDocumentIds.includes(documentId)) {
+                selectedDocumentIds = selectedDocumentIds.filter((id) => id !== documentId);
+            } else {
+                selectedDocumentIds = [...selectedDocumentIds, documentId];
+            }
+
+            window.selectedDocumentIds = selectedDocumentIds;
+            loadDocuments();
+        }
+        
+        async function askQuestion() {
+            const queryInput = document.getElementById('queryInput');
+            const query = queryInput.value.trim();
+            
+            if (!query) {
+                alert('Please enter a question');
+                return;
+            }
+            
+            const loading = document.getElementById('loading');
+            const answerSection = document.getElementById('answerSection');
+            const askBtn = document.getElementById('askBtn');
+            
+            loading.classList.remove('hidden');
+            answerSection.classList.add('hidden');
+            askBtn.disabled = true;
+            askBtn.classList.add('opacity-50');
+            
+            try {
+                const response = await fetch(`${API_URL}/ask`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ query, document_ids: selectedDocumentIds })
+                });
+                
+                const result = await response.json();
+
+                renderAnswer(result.answer);
+                
+                const sourcesList = document.getElementById('sourcesList');
+                sourcesList.innerHTML = '';
+                
+                result.sources.forEach(source => {
+                    const tag = document.createElement('span');
+                    tag.className = 'source-tag text-white text-sm font-medium px-3 py-1 rounded-full';
+                    tag.innerHTML = `<i class="fas fa-file-pdf mr-1"></i>${source}`;
+                    sourcesList.appendChild(tag);
+                });
+                
+                answerSection.classList.remove('hidden');
+            } catch (error) {
+                console.error('Error asking question:', error);
+                alert('Error processing question: ' + error.message);
+            } finally {
+                loading.classList.add('hidden');
+                askBtn.disabled = false;
+                askBtn.classList.remove('opacity-50');
+            }
+        }
+        
+        async function clearDocuments() {
+            if (!confirm('Are you sure you want to clear all documents?')) {
+                return;
+            }
+            
+            try {
+                await fetch(`${API_URL}/clear`, { method: 'POST' });
+                selectedDocumentIds = [];
+                window.selectedDocumentIds = selectedDocumentIds;
+                loadDocuments();
+                document.getElementById('answerSection').classList.add('hidden');
+            } catch (error) {
+                console.error('Error clearing documents:', error);
+                alert('Error clearing documents: ' + error.message);
+            }
+        }
+        
+        // Load documents on page load
+        loadDocuments();
+        
+        // Allow Enter key to submit query
+        document.getElementById('queryInput').addEventListener('keypress', function(e) {
+            if (e.key === 'Enter') {
+                askQuestion();
+            }
+        });
+    </script>
+</body>
+</html>
