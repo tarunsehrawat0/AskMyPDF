@@ -1,4 +1,5 @@
 import os
+import base64
 from pathlib import Path
 
 import streamlit as st
@@ -34,24 +35,32 @@ with left_col:
         label_visibility='collapsed',
     )
 
+    analyze_images = st.checkbox('Analyze images in PDFs (requires OpenAI API)', value=True, help='Extract and analyze images using GPT-4 Vision for better search results')
+    
     if st.button('Index Uploaded PDFs', use_container_width=True):
         if not uploaded_files:
             st.warning('Please upload at least one PDF first.')
         else:
             Path(PDF_STORAGE_DIR).mkdir(exist_ok=True)
             success_count = 0
+            total_images = 0
+            
+            with st.spinner('Indexing PDFs... This may take a few minutes if images are being analyzed.'):
+                for uploaded_file in uploaded_files:
+                    pdf_path = os.path.join(PDF_STORAGE_DIR, uploaded_file.name)
+                    with open(pdf_path, 'wb') as out_file:
+                        out_file.write(uploaded_file.getbuffer())
 
-            for uploaded_file in uploaded_files:
-                pdf_path = os.path.join(PDF_STORAGE_DIR, uploaded_file.name)
-                with open(pdf_path, 'wb') as out_file:
-                    out_file.write(uploaded_file.getbuffer())
-
-                result = assistant.add_pdf(uploaded_file.name, pdf_path)
-                if result.get('success'):
-                    success_count += 1
+                    result = assistant.add_pdf(uploaded_file.name, pdf_path, analyze_images=analyze_images)
+                    if result.get('success'):
+                        success_count += 1
+                        total_images += result.get('image_count', 0)
 
             if success_count:
-                st.success(f'Indexed {success_count} file(s).')
+                msg = f'Indexed {success_count} file(s).'
+                if total_images > 0:
+                    msg += f' Found and analyzed {total_images} image(s).'
+                st.success(msg)
             else:
                 st.error('No files were indexed. Check the error logs and API key setup.')
 
@@ -77,10 +86,33 @@ with left_col:
             {
                 'Document': [assistant.documents[doc_id]['name'] for doc_id in document_ids],
                 'Chunks': [assistant.documents[doc_id]['chunk_count'] for doc_id in document_ids],
+                'Images': [assistant.documents[doc_id].get('image_count', 0) for doc_id in document_ids],
             },
             use_container_width=True,
             hide_index=True,
         )
+        
+        # Show images for selected documents
+        if selected:
+            st.subheader('Extracted Images')
+            for doc_id in selected:
+                if doc_id in assistant.documents and assistant.documents[doc_id].get('images'):
+                    images = assistant.documents[doc_id]['images']
+                    st.write(f"**{assistant.documents[doc_id]['name']}** ({len(images)} images)")
+                    
+                    for img in images[:10]:  # Show first 10 images to avoid overwhelming
+                        col1, col2 = st.columns([1, 3])
+                        with col1:
+                            # Display image from base64
+                            image_data = base64.b64decode(img['base64'])
+                            st.image(image_data, caption=f"Page {img['page']}", use_column_width=True)
+                        with col2:
+                            if img.get('description'):
+                                st.info(f"**Description:** {img['description']}")
+                        st.divider()
+                    
+                    if len(images) > 10:
+                        st.caption(f"... and {len(images) - 10} more images")
 
     if st.button('Clear All Documents', type='secondary', use_container_width=True):
         assistant.documents = {}

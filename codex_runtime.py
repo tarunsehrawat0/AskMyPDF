@@ -1,9 +1,12 @@
 import os
 import json
+import base64
 from typing import List, Dict, Optional
 from pathlib import Path
 import PyPDF2
 import pdfplumber
+from PIL import Image
+import io
 from sentence_transformers import SentenceTransformer
 import faiss
 import numpy as np
@@ -98,6 +101,69 @@ class PDFResearchAssistant:
                 print(f"PyPDF2 also failed: {e2}")
         return text
     
+    def extract_images_from_pdf(self, pdf_path: str) -> List[Dict]:
+        images = []
+        try:
+            with pdfplumber.open(pdf_path) as pdf:
+                for page_num, page in enumerate(pdf.pages):
+                    # Try to extract images from the page
+                    if hasattr(page, 'images') and page.images:
+                        for img_index, img in enumerate(page.images):
+                            try:
+                                # Extract the image data
+                                image_data = page.to_image()
+                                # Convert to bytes
+                                img_bytes = image_data.original
+                                
+                                # Convert to base64
+                                image_base64 = base64.b64encode(img_bytes).decode('utf-8')
+                                
+                                images.append({
+                                    'page': page_num + 1,
+                                    'index': img_index,
+                                    'base64': image_base64,
+                                    'ext': 'png',
+                                    'description': None
+                                })
+                            except Exception as e:
+                                print(f"Error extracting image {img_index} from page {page_num}: {e}")
+                                continue
+        except Exception as e:
+            print(f"Error extracting images with pdfplumber: {e}")
+        
+        return images
+    
+    def analyze_image(self, image_base64: str) -> str:
+        if openai_client is None:
+            return "OpenAI API key not configured for image analysis."
+        
+        try:
+            response = openai_client.chat.completions.create(
+                model="gpt-4o",
+                messages=[
+                    {
+                        "role": "user",
+                        "content": [
+                            {
+                                "type": "text",
+                                "text": "Describe this image in detail. What does it show? Include any text, charts, graphs, diagrams, or important visual information that might be relevant for answering questions about the document."
+                            },
+                            {
+                                "type": "image_url",
+                                "image_url": {
+                                    "url": f"data:image/jpeg;base64,{image_base64}"
+                                }
+                            }
+                        ]
+                    }
+                ],
+                max_tokens=300
+            )
+            return response.choices[0].message.content
+        except Exception as e:
+            print(f"Error analyzing image: {e}")
+            return f"Error analyzing image: {str(e)}"
+    
     def chunk_text(self, text: str, chunk_size: int = 500, overlap: int = 50) -> List[str]:
         chunks = []
         words = text.split()
@@ -106,7 +172,7 @@ class PDFResearchAssistant:
             chunks.append(chunk)
         return chunks
     
-    def add_pdf(self, pdf_name: str, pdf_path: str) -> Dict:
+    def add_pdf(self, pdf_name: str, pdf_path: str, analyze_images: bool = True) -> Dict:
         model = load_embedding_model()
 
         if model is None:
@@ -118,12 +184,30 @@ class PDFResearchAssistant:
         text = self.extract_text_from_pdf(pdf_path)
         chunks = self.chunk_text(text)
         
+        # Extract and analyze images
+        images = self.extract_images_from_pdf(pdf_path)
+        image_descriptions = []
+        
+        if analyze_images and images:
+            for img in images:
+                print(f"Analyzing image on page {img['page']}...")
+                description = self.analyze_image(img['base64'])
+                img['description'] = description
+                image_descriptions.append(f"[Image on page {img['page']}: {description}]")
+        
+        # Add image descriptions as separate chunks for search
+        if image_descriptions:
+            image_chunks = [f"Image content: {desc}" for desc in image_descriptions]
+            chunks.extend(image_chunks)
+        
         doc_id = pdf_name
         self.documents[doc_id] = {
             'name': pdf_name,
             'path': pdf_path,
             'chunks': chunks,
-            'chunk_count': len(chunks)
+            'chunk_count': len(chunks),
+            'images': images,
+            'image_count': len(images)
         }
         
         # Generate embeddings for new chunks
@@ -147,7 +231,9 @@ class PDFResearchAssistant:
         return {
             'success': True,
             'document_id': doc_id,
-            'chunk_count': len(chunks)
+            'chunk_count': len(chunks),
+            'image_count': len(images),
+            'images_analyzed': len(image_descriptions)
         }
     
     def search(self, query: str, top_k: int = 5, document_ids: Optional[List[str]] = None) -> List[Dict]:
