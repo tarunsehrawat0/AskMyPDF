@@ -42,13 +42,23 @@ def load_embedding_model():
 
     return embedding_model
 
-openai_api_key = os.getenv('OPENAI_API_KEY')
-openai_client = OpenAI(api_key=openai_api_key) if openai_api_key else None
+def get_openai_client() -> Optional[OpenAI]:
+    # Try environment variable
+    api_key = os.getenv('OPENAI_API_KEY')
+    
+    # If not found or placeholder, check streamlit secrets
+    if not api_key or api_key == "your_openai_api_key_here":
+        try:
+            import streamlit as st
+            if "OPENAI_API_KEY" in st.secrets:
+                api_key = st.secrets["OPENAI_API_KEY"]
+        except Exception:
+            pass
+            
+    if api_key and api_key != "your_openai_api_key_here":
+        return OpenAI(api_key=api_key)
+    return None
 
-if openai_client:
-    print('OpenAI client initialized successfully.')
-else:
-    print('Warning: no OpenAI API key found. Set OPENAI_API_KEY in .env.')
 
 # Storage
 PDF_STORAGE_DIR = 'pdfs'
@@ -134,6 +144,7 @@ class PDFResearchAssistant:
         return images
     
     def analyze_image(self, image_base64: str) -> str:
+        openai_client = get_openai_client()
         if openai_client is None:
             return "OpenAI API key not configured for image analysis."
         
@@ -274,6 +285,7 @@ class PDFResearchAssistant:
         return results[:top_k]
     
     def generate_answer(self, query: str, context_chunks: List[str]) -> str:
+        openai_client = get_openai_client()
         if openai_client is None:
             return 'OpenAI API key is missing. Set OPENAI_API_KEY in .env to enable answer generation.'
 
