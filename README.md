@@ -26,23 +26,26 @@ pip install -r requirements.txt
 
 ## Usage
 
-1. **Start the server**:
+1. **Start the FastAPI health app**:
 ```bash
-python codex_runtime.py
+python app.py
 ```
 
-   Or, if you prefer an npm command on Windows:
+   Or, with Uvicorn directly:
 ```bash
-npm run dev
-```
-
-   Or run the Streamlit app:
-```bash
-streamlit run streamlit_app.py
+uvicorn app:app --host 0.0.0.0 --port 8000
 ```
 
 2. **Open your browser**:
-   Navigate to `http://localhost:5000`
+   Navigate to `http://localhost:8000`
+
+3. **Run the full Streamlit interface**:
+```bash
+python -m streamlit run streamlit_app.py --server.port 8501 --server.address 0.0.0.0
+```
+
+4. **Open the Streamlit UI**:
+   Navigate to `http://localhost:8501`
 
 3. **Upload PDFs**:
    - Click the upload area or drag and drop PDF files

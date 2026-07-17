@@ -7,7 +7,7 @@ app = FastAPI()
 
 @app.get("/")
 async def root():
-    return {"status": "ok", "message": "AskMyPDF service is running."}
+    return {"status": "ok", "message": "AskMyPDF FastAPI service is running."}
 
 
 @app.get("/health")
