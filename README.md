@@ -39,7 +39,7 @@ uvicorn app:app --host 0.0.0.0 --port 8000
 2. **Open your browser**:
    Navigate to `http://localhost:8000`
 
-3. **Run the full Streamlit interface**:
+3. **Run the full Streamlit interface** (optional):
 ```bash
 python -m streamlit run streamlit_app.py --server.port 8501 --server.address 0.0.0.0
 ```
