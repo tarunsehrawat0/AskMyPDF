@@ -11,4 +11,4 @@ services:
     env: python
     pythonVersion: 3.11
     buildCommand: pip install -r requirements.txt
-    startCommand: streamlit run streamlit_app.py --server.port=$PORT --server.address=0.0.0.0
+    startCommand: streamlit run streamlit_app.py --server.port=$PORT --server.address=0.0.0.0 --server.fileWatcherType=none
