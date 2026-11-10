@@ -47,6 +47,12 @@ python -m streamlit run streamlit_app.py --server.port 8501 --server.address 0.0
 4. **Open the Streamlit UI**:
    Navigate to `http://localhost:8501`
 
+5. **Deploy the frontend to Render**:
+   - The repository defines its Render services in `render.yaml`.
+   - The frontend service starts with:
+     `streamlit run streamlit_app.py --server.port=$PORT --server.address=0.0.0.0`
+   - Use Render CLI or the Render dashboard to create and deploy the `AskMyPDF Frontend` service.
+
 3. **Upload PDFs**:
    - Click the upload area or drag and drop PDF files
    - Multiple files supported
