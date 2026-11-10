@@ -11,4 +11,4 @@ services:
     env: python
     pythonVersion: 3.11
     buildCommand: pip install -r requirements.txt
-    startCommand: streamlit run streamlit_app.py --server.port=$PORT --server.address=0.0.0.0 --server.fileWatcherType=none --server.enableCORS=false --server.enableXsrfProtection=false --server.enableWebsocketCompression=false
+    startCommand: STREAMLIT_SERVER_FILE_WATCHER_TYPE=none STREAMLIT_SERVER_ENABLE_CORS=false STREAMLIT_SERVER_ENABLE_XSRF_PROTECTION=false STREAMLIT_SERVER_ENABLE_WEBSOCKET_COMPRESSION=false streamlit run streamlit_app.py --server.port=$PORT --server.address=0.0.0.0
